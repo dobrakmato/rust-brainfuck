@@ -1,0 +1,9 @@
+[package]
+name = "rust-test1"
+version = "0.1.0"
+authors = ["Matej <dobrakmato@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+memmap = "0.7.0"
+bitflags = "1.0.4"
