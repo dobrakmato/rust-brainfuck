@@ -60,3 +60,103 @@ impl<'a, R: Read, W: Write> Interpreter<'a, R, W> {
         }
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use crate::interpreter::Interpreter;
+    use crate::brainfuck::{MAX_MEMORY, Program};
+    use std::io::{Stdin, Stdout, Cursor};
+
+    fn make_interpreter(program: &Program) -> Interpreter<Stdin, Stdout> {
+        return Interpreter {
+            program_counter: 0,
+            program: &program,
+            memory_pointer: 0,
+            memory: [0; MAX_MEMORY],
+            input: std::io::stdin(),
+            output: std::io::stdout(),
+        };
+    }
+
+    #[test]
+    fn increment_memory() {
+        let program = Program::from_string("+++");
+        let mut vm = make_interpreter(&program);
+        vm.interpret();
+
+        assert_eq!(vm.memory_at(0), 3);
+        assert_eq!(vm.memory_at(1), 0);
+        assert_eq!(vm.memory_at(2), 0);
+    }
+
+    #[test]
+    fn decrement_memory() {
+        let program = Program::from_string("+++--");
+        let mut vm = make_interpreter(&program);
+        vm.interpret();
+
+        assert_eq!(vm.memory_at(0), 1);
+        assert_eq!(vm.memory_at(1), 0);
+        assert_eq!(vm.memory_at(2), 0);
+    }
+
+    #[test]
+    fn move_ptr() {
+        let program = Program::from_string("+++>++>+<-");
+        let mut vm = make_interpreter(&program);
+        vm.interpret();
+
+        assert_eq!(vm.memory_at(0), 3);
+        assert_eq!(vm.memory_at(1), 1);
+        assert_eq!(vm.memory_at(2), 1);
+    }
+
+    #[test]
+    fn loops_work() {
+        let program = Program::from_string("+>+++[-]");
+        let mut vm = make_interpreter(&program);
+        vm.interpret();
+
+        assert_eq!(vm.memory_at(0), 1);
+        assert_eq!(vm.memory_at(1), 0);
+        assert_eq!(vm.memory_at(2), 0);
+    }
+
+    #[test]
+    fn can_read_input() {
+        let program = Program::from_string(",>,>,");
+        let mut vm = Interpreter {
+            program_counter: 0,
+            program: &program,
+            memory_pointer: 0,
+            memory: [0; MAX_MEMORY],
+            input: Cursor::new(b"abc"),
+            output: std::io::stdout(),
+        };
+        vm.interpret();
+
+        assert_eq!(vm.memory_at(0), b'a');
+        assert_eq!(vm.memory_at(1), b'b');
+        assert_eq!(vm.memory_at(2), b'c');
+    }
+
+    #[test]
+    fn can_write_output() {
+        let program = Program::from_string("++++++++[->+++++++<]>.");
+        let mut data = Vec::new();
+        let mut vm = Interpreter {
+            program_counter: 0,
+            program: &program,
+            memory_pointer: 0,
+            memory: [0; MAX_MEMORY],
+            input: std::io::stdin(),
+            output: &mut data,
+        };
+        vm.interpret();
+
+        assert_eq!(vm.memory_at(1), b'8');
+        assert_eq!(vm.memory_at(2), 0);
+        assert_eq!(data[0], b'8');
+    }
+}

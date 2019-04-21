@@ -1,6 +1,7 @@
 /// Maximum memory in bytes an interpreter can use.
 pub const MAX_MEMORY: usize = 30000;
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Op {
     IncrementPtr,
     DecrementPtr,
@@ -33,15 +34,13 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_string(string: String) -> Self {
+    pub fn from_string(string: &str) -> Self {
         let ops: Vec<Op> = string.chars()
             .map(|c| -> Option<Op> { Op::from_char(c) })
             .filter_map(|x| x)
             .collect();
 
-        Program {
-            instructions: ops,
-        }
+        Program { instructions: ops }
     }
 
     pub fn find_matching_jump_end(&self, jump_start_pos: usize) -> usize {
@@ -76,5 +75,47 @@ impl Program {
             if pos == 0 { panic!("unbalanced parentheses") }
             pos -= 1
         }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use crate::brainfuck::{Program, Op};
+
+    #[test]
+    fn check_supported_ops() {
+        let program = Program::from_string("><+-.,[]");
+
+        assert_eq!(program.instructions[0], Op::IncrementPtr);
+        assert_eq!(program.instructions[1], Op::DecrementPtr);
+        assert_eq!(program.instructions[2], Op::IncrementMemory);
+        assert_eq!(program.instructions[3], Op::DecrementMemory);
+        assert_eq!(program.instructions[4], Op::WriteByte);
+        assert_eq!(program.instructions[5], Op::ReadByte);
+        assert_eq!(program.instructions[6], Op::JumpForward);
+        assert_eq!(program.instructions[7], Op::JumpBackward);
+    }
+
+    #[test]
+    fn ignores_comments() {
+        let program = Program::from_string(">loop[-]");
+
+        assert_eq!(program.instructions.len(), 4);
+        assert_eq!(program.instructions[0], Op::IncrementPtr);
+        assert_eq!(program.instructions[1], Op::JumpForward);
+        assert_eq!(program.instructions[2], Op::DecrementMemory);
+        assert_eq!(program.instructions[3], Op::JumpBackward);
+    }
+
+    #[test]
+    fn find_matching_parentheses() {
+        let program = Program::from_string("[[][]]");
+
+        assert_eq!(program.find_matching_jump_end(0), 5);
+        assert_eq!(program.find_matching_jump_start(5), 0);
+
+        assert_eq!(program.find_matching_jump_end(3), 4);
+        assert_eq!(program.find_matching_jump_start(4), 3);
     }
 }

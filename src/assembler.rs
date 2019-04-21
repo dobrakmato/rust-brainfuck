@@ -33,11 +33,11 @@ pub enum X64Register {
 
 impl X64Register {
     fn is_extended(self) -> bool {
-        return self as u8 > 7
+        self as u8 > 7
     }
 
     fn to_u8(self) -> u8 {
-        return self as u8 & 7 // wrap
+        self as u8 & 7 // wrap
     }
 }
 

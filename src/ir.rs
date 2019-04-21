@@ -107,10 +107,12 @@ impl IrCode {
         let mut len = 0;
 
         loop {
+            if idx == std::usize::MAX { return len; }
+
             let replacement = self.find_replacement(idx);
             let next_idx = match replacement.next() {
                 Some(t) => t,
-                None => return len
+                None => std::usize::MAX,
             };
             self.ops[idx] = replacement;
             idx = next_idx;
@@ -184,6 +186,99 @@ impl Debug for IrCode {
 
         f.write_str("}\n")?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::ir::{IrCode, IrOp};
+    use crate::brainfuck::Program;
+    use matches::assert_matches;
+
+    #[test]
+    fn iter() {
+        let ir_code = IrCode::new(&Program::from_string("+-<>"));
+        let mut iter = ir_code.iter();
+
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Sub(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Left(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn len() {
+        let mut ir_code = IrCode::new(&Program::from_string("+++>+"));
+
+        assert_eq!(ir_code.len(), 5);
+        ir_code.optimize();
+        assert_eq!(ir_code.len(), 3);
+    }
+
+    #[test]
+    fn optimizes_tail_instructions() {
+        let mut ir_code = IrCode::new(&Program::from_string("+++"));
+        ir_code.optimize();
+        let mut iter = ir_code.iter();
+
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 3)));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn optimizes_consecutive_adds() {
+        let mut ir_code = IrCode::new(&Program::from_string("+++>++"));
+        ir_code.optimize();
+        let mut iter = ir_code.iter();
+
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 3)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 2)));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn optimizes_consecutive_subtractions() {
+        let mut ir_code = IrCode::new(&Program::from_string("--->-"));
+        ir_code.optimize();
+        let mut iter = ir_code.iter();
+
+        assert_matches!(iter.next(), Some(IrOp::Sub(_, 3)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Sub(_, 1)));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn optimizes_consecutive_lefts_rights() {
+        let mut ir_code = IrCode::new(&Program::from_string(">>+>>>-<<<<+"));
+
+        ir_code.optimize();
+        let mut iter = ir_code.iter();
+
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 2)));
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 3)));
+        assert_matches!(iter.next(), Some(IrOp::Sub(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Left(_, 4)));
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 1)));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn optimizes_clear_loops() {
+        let mut ir_code = IrCode::new(&Program::from_string("+++[-]-[+]>"));
+
+        ir_code.optimize();
+        let mut iter = ir_code.iter();
+
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 3)));
+        assert_matches!(iter.next(), Some(IrOp::SetIndirect(_, 0)));
+        assert_matches!(iter.next(), Some(IrOp::Sub(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::SetIndirect(_, 0)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), None);
     }
 }
 

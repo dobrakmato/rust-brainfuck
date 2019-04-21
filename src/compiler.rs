@@ -5,13 +5,10 @@ use crate::brainfuck::MAX_MEMORY;
 use crate::assembler::{Assembler, X64Register};
 
 /* Brainfuck Read and Write procedures. */
-
-#[allow(dead_code)]
 extern "win64" fn putchar(character: u8) {
     print!("{}", character as char);
 }
 
-#[allow(dead_code)]
 extern "win64" fn getchar() -> u8 {
     let mut buff: [u8; 1] = [0; 1];
     stdin().read_exact(&mut buff).expect("cannot read from stdin");
@@ -29,7 +26,7 @@ impl IrCode {
 
         let length = self.len();
 
-        let mut brainfuck = Brainfuck::new(length * 8);
+        let mut brainfuck = Brainfuck::new(256 + length * 8);
         let mut assembler: Assembler = Assembler::new(&mut brainfuck.program);
 
         assembler.mov(PUTCHAR_REGISTER, put_addr as u64);
@@ -79,7 +76,12 @@ impl IrCode {
         assembler.ret();
 
         /* 2. resolve jumps */
-        let jumps_to_fix: Vec<(String, usize)> = assembler.labels.iter().filter(|(k, _)| k.starts_with('[')).map(|(k, v)| (k.clone(), *v)).collect();
+        let jumps_to_fix: Vec<(String, usize)> = assembler.labels
+            .iter()
+            .filter(|(k, _)| k.starts_with('['))
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+
         for (k, v) in jumps_to_fix {
             assembler.addr = v;
             assembler.cmp_indirect(PTR_REGISTER, 0);
@@ -114,5 +116,18 @@ impl Brainfuck {
         let compiled_brainfuck: extern "C" fn() = unsafe { std::mem::transmute(ptr) };
 
         compiled_brainfuck();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::ir::{IrCode, IrOp};
+
+    #[test]
+    fn does_not_crash() {
+        let mut ir_code = IrCode { ops: vec![IrOp::Noop(None)] };
+        let brainfuck = ir_code.compile();
+
+        brainfuck.execute();
     }
 }

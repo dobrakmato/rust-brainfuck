@@ -12,7 +12,7 @@ mod interpreter;
 fn main() {
     let file = std::env::args().nth(1).expect("no input file provided");
     let content = std::fs::read_to_string(file).expect("cannot read specified file");
-    let program = Program::from_string(content);
+    let program = Program::from_string(&content);
 
     // Create the VM with program, memory and registers.
     let mut vm = Interpreter {
@@ -25,7 +25,7 @@ fn main() {
     };
 
     let start = Instant::now();
-    //vm.interpret();
+    vm.interpret();
     println!("interpreted time = {}ms", start.elapsed().as_millis());
 
     let start = Instant::now();

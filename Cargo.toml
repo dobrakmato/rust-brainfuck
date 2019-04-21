@@ -7,3 +7,6 @@ edition = "2018"
 [dependencies]
 memmap = "0.7.0"
 bitflags = "1.0.4"
+
+[dev-dependencies]
+matches = "0.1.8"
