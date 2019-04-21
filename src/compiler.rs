@@ -47,8 +47,7 @@ impl IrCode {
                 IrOp::Left(_, data) => assembler.sub(PTR_REGISTER, (*data).into()),
                 IrOp::Add(_, data) => assembler.add_indirect(PTR_REGISTER, *data),
                 IrOp::Sub(_, data) => assembler.sub_indirect(PTR_REGISTER, *data),
-                IrOp::SetDirect(_, data) => assembler.mov(PTR_REGISTER, (*data).into()),
-                IrOp::SetIndirect(_, _data) => panic!("set indirect not supported"),
+                IrOp::SetIndirect(_, data) => assembler.mov_indirect(PTR_REGISTER, *data),
                 IrOp::Write(_) => {
                     assembler.sub(X64Register::RSP, 168);
                     assembler.mov_to_reg(X64Register::RCX, PTR_REGISTER);

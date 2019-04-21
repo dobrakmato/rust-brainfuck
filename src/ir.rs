@@ -12,7 +12,6 @@ pub enum IrOp {
     Left(Link, u8),
     Add(Link, u8),
     Sub(Link, u8),
-    SetDirect(Link, u8),
     SetIndirect(Link, u8),
     Write(Link),
     Read(Link),
@@ -30,7 +29,6 @@ impl IrOp {
             IrOp::Left(l, _) => l,
             IrOp::Add(l, _) => l,
             IrOp::Sub(l, _) => l,
-            IrOp::SetDirect(l, _) => l,
             IrOp::SetIndirect(l, _) => l,
             IrOp::Write(l) => l,
             IrOp::Read(l) => l,
@@ -74,7 +72,21 @@ impl IrCode {
             None => return *current
         };
         let next = self.ops.get(next_idx).expect("next not found");
+        let subsequent_idx = next.next();
 
+        /* three consecutive ops */
+        if let Some(t) = subsequent_idx {
+            let subsequent = self.ops.get(t).expect("subsequent not found");
+            let replacement = match (current, next, subsequent) {
+                (IrOp::JumpIfZero(_, _), IrOp::Sub(_, 1), IrOp::JumpIfNotZero(far, _)) => Some(IrOp::SetIndirect(*far, 0)),
+                (IrOp::JumpIfZero(_, _), IrOp::Add(_, 1), IrOp::JumpIfNotZero(far, _)) => Some(IrOp::SetIndirect(*far, 0)),
+                _ => None,
+            };
+
+            if let Some(t) = replacement { return t; }
+        }
+
+        /* two consecutive ops */
         match (current, next) {
             (IrOp::Right(_, x), IrOp::Right(far, y)) => IrOp::Right(*far, *x + *y),
             (IrOp::Right(_, x), IrOp::Left(far, y)) => IrOp::Left(*far, *x - *y),

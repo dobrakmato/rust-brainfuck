@@ -1,6 +1,15 @@
 use std::collections::HashMap;
 use bitflags::bitflags;
 
+bitflags! {
+    struct Rex: u8 {
+        const B = 0b0100_0001; // This 1-bit value is an extension to the MODRM.rm field or the SIB.base field. See 64-bit addressing.
+        const X = 0b0100_0010; // This 1-bit value is an extension to the SIB.index field. See 64-bit addressing.
+        const R = 0b0100_0100; // This 1-bit value is an extension to the MODRM.reg field. See Registers.
+        const W = 0b0100_1000; // When 1, a 64-bit operand size is used. Otherwise, when 0, the default operand size is used (which is 32-bit for most but not all instructions, see this table).
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum X64Register {
@@ -24,11 +33,11 @@ pub enum X64Register {
 
 impl X64Register {
     fn is_extended(self) -> bool {
-        self as u8 > 7
+        return self as u8 > 7
     }
 
     fn to_u8(self) -> u8 {
-        self as u8 & 7 // wrap
+        return self as u8 & 7 // wrap
     }
 }
 
@@ -88,6 +97,30 @@ impl<'a> Assembler<'a> {
         self.put(rex.bits());
         self.put(0xB8 + reg.to_u8());
         self.imm64(imm);
+    }
+
+    pub fn mov_indirect(&mut self, memory: X64Register, imm: u8) {
+        if memory.is_extended() {
+            self.put(Rex::B.bits());
+        }
+
+        self.put(0xC6);
+
+        match memory {
+            X64Register::R12 => {
+                self.mod_rm(0, 0b00, 4);
+                self.sib(4, 0, 4);
+            }
+            X64Register::R13 => {
+                self.mod_rm(0, 0b01, 0b101);
+                self.put(0x00); // +0 (+disp8)
+            }
+            _ => {
+                self.mod_rm(0, 0b00, memory.to_u8());
+            }
+        }
+
+        self.put(imm);
     }
 
     pub fn add(&mut self, reg: X64Register, imm: u32) {
@@ -231,16 +264,6 @@ impl<'a> Assembler<'a> {
     }
 }
 
-bitflags! {
-    struct Rex: u8 {
-        const B = 0b0100_0001; // This 1-bit value is an extension to the MODRM.rm field or the SIB.base field. See 64-bit addressing.
-        const X = 0b0100_0010; // This 1-bit value is an extension to the SIB.index field. See 64-bit addressing.
-        const R = 0b0100_0100; // This 1-bit value is an extension to the MODRM.reg field. See Registers.
-        const W = 0b0100_1000; // When 1, a 64-bit operand size is used. Otherwise, when 0, the default operand size is used (which is 32-bit for most but not all instructions, see this table).
-    }
-}
-
-
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
@@ -263,6 +286,31 @@ mod test {
         // 49 bc ef be ad de ef be ad de    movabs r12,0xdeadbeefdeadbeef
         asm.mov(X64Register::R12, 0xdead_beef_dead_beef);
         assert_eq!(asm.data[..10], [0x49, 0xbc, 0xef, 0xbe, 0xad, 0xde, 0xef, 0xbe, 0xad, 0xde]);
+        asm.addr = 0;
+    }
+
+    #[test]
+    fn mov_indirect() {
+        let mut asm = Assembler { addr: 0, data: &mut [0; 32], labels: HashMap::new() };
+
+        // c6 02 58                mov    BYTE PTR [rdx],0x58
+        asm.mov_indirect(X64Register::RDX, 0x58);
+        assert_eq!(asm.data[..3], [0xc6, 0x02, 0x58]);
+        asm.addr = 0;
+
+        // 41 c6 00 58             mov    BYTE PTR [r8],0x58
+        asm.mov_indirect(X64Register::R8, 0x58);
+        assert_eq!(asm.data[..4], [0x41, 0xc6, 0x00, 0x58]);
+        asm.addr = 0;
+
+        // 41 c6 04 24 58          mov    BYTE PTR [r12],0x58
+        asm.mov_indirect(X64Register::R12, 0x58);
+        assert_eq!(asm.data[..5], [0x41, 0xc6, 0x04, 0x24, 0x58]);
+        asm.addr = 0;
+
+        // 41 c6 45 00 58          mov    BYTE PTR [r13+0x0],0x58
+        asm.mov_indirect(X64Register::R13, 0x58);
+        assert_eq!(asm.data[..5], [0x41, 0xc6, 0x45, 0x00, 0x58]);
         asm.addr = 0;
     }
 
