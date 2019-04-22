@@ -88,7 +88,6 @@ impl IrCode {
 
         /* two consecutive ops */
         match (current, next) {
-
             (IrOp::Add(_, x), IrOp::Add(far, y)) => IrOp::Add(*far, *x + *y),
             (IrOp::Sub(_, x), IrOp::Sub(far, y)) => IrOp::Sub(*far, *x + *y),
             (IrOp::Sub(_, x), IrOp::Add(far, y)) => {
@@ -110,6 +109,14 @@ impl IrCode {
                 let result = *y as i8 - *x as i8;
                 if result > 0 { IrOp::Right(*far, result as u8) } else { IrOp::Left(*far, -result as u8) }
             }
+
+            (IrOp::SetIndirect(_, c), IrOp::Add(far, x)) => IrOp::SetIndirect(*far, c + x),
+            (IrOp::SetIndirect(_, c), IrOp::Sub(far, x)) => IrOp::SetIndirect(*far, c.wrapping_sub(*x)),
+
+            (IrOp::Add(_, _), IrOp::SetIndirect(far, c)) => IrOp::SetIndirect(*far, *c),
+            (IrOp::Sub(_, _), IrOp::SetIndirect(far, c)) => IrOp::SetIndirect(*far, *c),
+
+            (IrOp::SetIndirect(_, _), IrOp::SetIndirect(far, c)) => IrOp::SetIndirect(*far, *c),
 
             (c, _) => *c,
         }
@@ -210,13 +217,15 @@ mod test {
 
     #[test]
     fn iter() {
-        let ir_code = IrCode::new(&Program::from_string("+-<>"));
+        let ir_code = IrCode::new(&Program::from_string("+-<>.,"));
         let mut iter = ir_code.iter();
 
         assert_matches!(iter.next(), Some(IrOp::Add(_, 1)));
         assert_matches!(iter.next(), Some(IrOp::Sub(_, 1)));
         assert_matches!(iter.next(), Some(IrOp::Left(_, 1)));
         assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Write(_)));
+        assert_matches!(iter.next(), Some(IrOp::Read(_)));
         assert_matches!(iter.next(), None);
     }
 
@@ -252,6 +261,38 @@ mod test {
     }
 
     #[test]
+    fn optimizes_consecutive_mixed_adds() {
+        let mut ir_code = IrCode::new(&Program::from_string("+++-->---++>--+++>++---"));
+        ir_code.optimize();
+        let mut iter = ir_code.iter();
+
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Sub(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Sub(_, 1)));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn optimizes_consecutive_mixed_lefts_rights() {
+        let mut ir_code = IrCode::new(&Program::from_string(">>><<+<<<>>+<<>>>+>><<<"));
+        ir_code.optimize();
+        let mut iter = ir_code.iter();
+
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Left(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Add(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Left(_, 1)));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
     fn optimizes_consecutive_subtractions() {
         let mut ir_code = IrCode::new(&Program::from_string("--->-"));
         ir_code.optimize();
@@ -281,62 +322,41 @@ mod test {
 
     #[test]
     fn optimizes_clear_loops() {
-        let mut ir_code = IrCode::new(&Program::from_string("+++[-]-[+]>"));
+        let mut ir_code = IrCode::new(&Program::from_string("[-]>[+]>"));
 
         ir_code.optimize();
         let mut iter = ir_code.iter();
 
-        assert_matches!(iter.next(), Some(IrOp::Add(_, 3)));
         assert_matches!(iter.next(), Some(IrOp::SetIndirect(_, 0)));
-        assert_matches!(iter.next(), Some(IrOp::Sub(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
         assert_matches!(iter.next(), Some(IrOp::SetIndirect(_, 0)));
         assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
         assert_matches!(iter.next(), None);
     }
+
+    #[test]
+    fn optimizes_adds_following_preceding_clear_loops() {
+        let mut ir_code = IrCode::new(&Program::from_string("+[-]+++++>-[+]----"));
+
+        ir_code.optimize();
+        let mut iter = ir_code.iter();
+
+        assert_matches!(iter.next(), Some(IrOp::SetIndirect(_, 5)));
+        assert_matches!(iter.next(), Some(IrOp::Right(_, 1)));
+        assert_matches!(iter.next(), Some(IrOp::SetIndirect(_, 252)));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn optimizes_consecutive_sets() {
+        let mut ir_code = IrCode::new(&Program::from_string("+[-]+++++-[+]----"));
+
+        ir_code.optimize();
+        let mut iter = ir_code.iter();
+
+        assert_eq!(ir_code.len(), 1);
+
+        assert_matches!(iter.next(), Some(IrOp::SetIndirect(_, 252)));
+        assert_matches!(iter.next(), None);
+    }
 }
-
-// read program -> tokenize -> parse to ir -> optimize -> transform to asm -> execute
-// read program -> tokenize -> parse to ir -> optimize -> interpret
-
-// # Combine multiple instructions
-
-// Right(x), Right(y) -> Right(x+y)
-//// Right(x), Left(y) -> Left(x-y)
-//// Left(x), Right(y) -> Left(y-x)
-//// Left(x), Left(y) -> Left(x+y)
-//
-//// Add(x), Add(y) -> Add(x+y)
-//// Add(x), Sub(y) -> Sub(x-y)
-//// Sub(x), Add(y) -> Sub(y-x)
-//// Sub(x), Sub(y) -> Sub(x+y)
-//
-//// JumpIfZero, Sub(1), JumpIfNotZero -> Set(0)
-//// JumpIfZero, Add(1), JumpIfNotZero -> Set(0)
-//
-//// Set(0), Add(x) = Set(x)
-//// Set(x), Add(y) = Set(x+y)
-//
-//// Set(0), JumpIfZero -> JumpIfZero
-//
-//// Set(x), Set(y) -> Set(y)
-//
-//// Add(x), Set(y) -> Set(y)
-//// Sub(x), Set(y) -> Set(y)
-//
-//// Add(x), Read -> Read
-//// Sub(x), Read -> Read
-//// Set(x), Read -> Read
-//
-//// Add(0) -> Noop
-//// Sub(0) -> Noop
-//// Left(0) -> Noop
-//// Right(0) -> Noop
-//
-//// Noop, _ -> _
-//// _, Noop -> _
-
-
-// copy loops ? ([>+<-])
-// multiplication loops ? ([->++<])
-// scan loops ?
-// operation offsets ?

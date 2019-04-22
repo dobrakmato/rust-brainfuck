@@ -30,4 +30,4 @@ for file in os.listdir("../sample_programs"):
     jit_time = run_bfjit(file, ["-j"])
     jit_unoptimized_time = run_bfjit(file, ["-j", "-u"])
 
-    print(f"{file}|{interpreted_time}|{jit_unoptimized_time}|{jit_time}")
+    print(f"|`{file}`|{interpreted_time}|{jit_unoptimized_time}|{jit_time}|")
