@@ -1,5 +1,9 @@
 brainfuck-jit
 ----------------------
+[![Build Status](https://travis-ci.org/dobrakmato/rust-brainfuck.svg?branch=master)](https://travis-ci.org/dobrakmato/rust-brainfuck)
+[![Coverage Status](https://coveralls.io/repos/github/dobrakmato/rust-brainfuck/badge.svg?branch=master)](https://coveralls.io/github/dobrakmato/rust-brainfuck?branch=master)
+
+
 
 This is brainfuck optimizing compiler and interpreter written in Rust.
 
