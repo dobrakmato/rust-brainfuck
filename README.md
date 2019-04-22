@@ -19,7 +19,7 @@ Currently the JIT compilation is possible for following targets:
 
 To build the project just run `cargo` command.
 
-```bash
+```
 cargo build --release
 ```
 
@@ -27,7 +27,7 @@ cargo build --release
 
 The `bfjit` command accepts multiple flags which can be provided as command line arguments.
 
-```bash
+```
 > bfjit.exe --help
 bfjit v1.0
 
@@ -50,7 +50,7 @@ ARGS:
 
 To run provided test suite run `cargo` test command.
 
-```bash
+```
 cargo test
 ```
 
