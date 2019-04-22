@@ -13,6 +13,7 @@ rust:
 matrix:
   allow_failures:
     - rust: nightly
+    - rust: beta
 
 before_cache: |
   if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then
@@ -25,7 +26,7 @@ script:
   - cargo test
 
 after_success: |
-  if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then
+  if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
     # Uncomment the following line for coveralls.io
     cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
 
