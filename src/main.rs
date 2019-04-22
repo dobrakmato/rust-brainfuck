@@ -54,11 +54,20 @@ fn main() {
 }
 
 fn jit(matches: ArgMatches, program: &Program) {
+    let start = Instant::now();
     let mut ir_code = IrCode::new(&program);
+
+    let unopt_len = ir_code.len();
+
     if !matches.is_present("unoptimize") {
         ir_code.optimize();
     }
-    ir_code.compile().execute();
+
+    let opt_len = ir_code.len();
+
+    let brainfuck = ir_code.compile();
+    println!("compile_time={}ms\topt={}\tunopt={}\tbytes={}", start.elapsed().as_millis(), unopt_len, opt_len, brainfuck.program.len());
+    brainfuck.execute();
 }
 
 fn interpreter(program: &Program) {

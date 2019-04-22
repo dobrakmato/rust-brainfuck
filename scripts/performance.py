@@ -2,6 +2,15 @@ import os
 import subprocess
 
 
+def decode(s, encodings=('ascii', 'utf8', 'latin1')):
+    for encoding in encodings:
+        try:
+            return s.decode(encoding)
+        except UnicodeDecodeError:
+            pass
+    return s.decode('ascii', 'ignore')
+
+
 def run_bfjit(f, opts):
     proc = subprocess.Popen(["cargo", "run", "--release", "--", *opts, f"../sample_programs/{f}"],
                             stdout=subprocess.PIPE,
@@ -10,7 +19,7 @@ def run_bfjit(f, opts):
     if proc.returncode != 0:
         print(f"process crashed: {err}")
 
-    last_line = out.decode().split("\n")[-2].strip()
+    last_line = decode(out).split("\n")[-2].strip()
     return last_line.split(" ")[0].split("=")[1]
 
 

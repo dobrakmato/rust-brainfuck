@@ -88,17 +88,30 @@ impl IrCode {
 
         /* two consecutive ops */
         match (current, next) {
-            (IrOp::Right(_, x), IrOp::Right(far, y)) => IrOp::Right(*far, *x + *y),
-            (IrOp::Right(_, x), IrOp::Left(far, y)) => IrOp::Left(*far, *x - *y),
-            (IrOp::Left(_, x), IrOp::Right(far, y)) => IrOp::Left(*far, *y - *x),
-            (IrOp::Left(_, x), IrOp::Left(far, y)) => IrOp::Left(*far, *x + *y),
 
             (IrOp::Add(_, x), IrOp::Add(far, y)) => IrOp::Add(*far, *x + *y),
-            (IrOp::Add(_, x), IrOp::Sub(far, y)) => IrOp::Sub(*far, *x - *y),
-            (IrOp::Sub(_, x), IrOp::Add(far, y)) => IrOp::Sub(*far, *y - *x),
             (IrOp::Sub(_, x), IrOp::Sub(far, y)) => IrOp::Sub(*far, *x + *y),
+            (IrOp::Sub(_, x), IrOp::Add(far, y)) => {
+                let result = *y as i8 - *x as i8;
+                if result > 0 { IrOp::Add(*far, result as u8) } else { IrOp::Sub(*far, -result as u8) }
+            }
+            (IrOp::Add(_, x), IrOp::Sub(far, y)) => {
+                let result = *x as i8 - *y as i8;
+                if result > 0 { IrOp::Add(*far, result as u8) } else { IrOp::Sub(*far, -result as u8) }
+            }
 
-            (c, _) => *c
+            (IrOp::Right(_, x), IrOp::Right(far, y)) => IrOp::Right(*far, *x + *y),
+            (IrOp::Left(_, x), IrOp::Left(far, y)) => IrOp::Left(*far, *x + *y),
+            (IrOp::Right(_, x), IrOp::Left(far, y)) => {
+                let result = *x as i8 - *y as i8;
+                if result > 0 { IrOp::Right(*far, result as u8) } else { IrOp::Left(*far, -result as u8) }
+            }
+            (IrOp::Left(_, x), IrOp::Right(far, y)) => {
+                let result = *y as i8 - *x as i8;
+                if result > 0 { IrOp::Right(*far, result as u8) } else { IrOp::Left(*far, -result as u8) }
+            }
+
+            (c, _) => *c,
         }
     }
 
