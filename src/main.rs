@@ -3,6 +3,7 @@ use crate::brainfuck::{Program, Op, MAX_MEMORY};
 use crate::interpreter::Interpreter;
 use clap::{App, Arg, ArgMatches};
 use crate::ir::IrCode;
+use crate::compiler::IoFn;
 
 mod assembler;
 mod ir;
@@ -65,7 +66,7 @@ fn jit(matches: ArgMatches, program: &Program) {
 
     let opt_len = ir_code.len();
 
-    let brainfuck = ir_code.compile();
+    let brainfuck = ir_code.compile(IoFn::std());
     println!("compile_time={}ms\topt={}\tunopt={}\tbytes={}", start.elapsed().as_millis(), unopt_len, opt_len, brainfuck.program.len());
     brainfuck.execute();
 }

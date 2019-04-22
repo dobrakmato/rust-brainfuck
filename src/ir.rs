@@ -13,6 +13,8 @@ pub enum IrOp {
     Add(Link, u8),
     Sub(Link, u8),
     SetIndirect(Link, u8),
+    /* offset, factor */
+    MulCopy(Link, u8, u8),
     Write(Link),
     Read(Link),
     /* next, addr if 0 */
@@ -30,6 +32,7 @@ impl IrOp {
             IrOp::Add(l, _) => l,
             IrOp::Sub(l, _) => l,
             IrOp::SetIndirect(l, _) => l,
+            IrOp::MulCopy(l, _, _) => l,
             IrOp::Write(l) => l,
             IrOp::Read(l) => l,
             IrOp::JumpIfZero(l, _) => l,

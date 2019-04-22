@@ -19,18 +19,29 @@ const PUTCHAR_REGISTER: X64Register = X64Register::R12;
 const GETCHAR_REGISTER: X64Register = X64Register::R13;
 const PTR_REGISTER: X64Register = X64Register::R14;
 
-impl IrCode {
-    pub fn compile(&mut self) -> Brainfuck {
-        let put_addr = putchar as usize;
-        let get_addr = getchar as usize;
+pub struct IoFn {
+    putchar_ptr: usize,
+    getchar_ptr: usize,
+}
 
+impl IoFn {
+    pub fn std() -> Self {
+        return IoFn {
+            putchar_ptr: putchar as usize,
+            getchar_ptr: getchar as usize,
+        };
+    }
+}
+
+impl IrCode {
+    pub fn compile(&mut self, io_fn: IoFn) -> Brainfuck {
         let length = self.len();
 
         let mut brainfuck = Brainfuck::new(256 + length * 8);
         let mut assembler: Assembler = Assembler::new(&mut brainfuck.program);
 
-        assembler.mov(PUTCHAR_REGISTER, put_addr as u64);
-        assembler.mov(GETCHAR_REGISTER, get_addr as u64);
+        assembler.mov(PUTCHAR_REGISTER, io_fn.putchar_ptr as u64);
+        assembler.mov(GETCHAR_REGISTER, io_fn.getchar_ptr as u64);
         assembler.mov(PTR_REGISTER, brainfuck.memory.as_ptr() as u64);
 
         let mut parentheses_depth = 0usize;
@@ -45,6 +56,12 @@ impl IrCode {
                 IrOp::Add(_, data) => assembler.add_indirect(PTR_REGISTER, *data),
                 IrOp::Sub(_, data) => assembler.sub_indirect(PTR_REGISTER, *data),
                 IrOp::SetIndirect(_, data) => assembler.mov_indirect(PTR_REGISTER, *data),
+                IrOp::MulCopy(_, offset, factor) => {
+                    assembler.mov_to_reg(X64Register::RAX, PTR_REGISTER);
+                    assembler.mov(X64Register::RBX, u64::from(*factor));
+                    assembler.mul(X64Register::RBX);
+                    assembler.mov_to_mem_offset(PTR_REGISTER, X64Register::RAX, *offset)
+                }
                 IrOp::Write(_) => {
                     assembler.sub(X64Register::RSP, 168);
                     assembler.mov_to_reg(X64Register::RCX, PTR_REGISTER);
@@ -123,13 +140,36 @@ impl Brainfuck {
 mod test {
     use crate::ir::{IrCode, IrOp};
     use crate::brainfuck::Program;
+    use crate::compiler::{IoFn, getchar};
 
     #[test]
     fn does_not_crash() {
         let mut ir_code = IrCode { ops: vec![IrOp::Noop(None)] };
-        let brainfuck = ir_code.compile();
+        let brainfuck = ir_code.compile(IoFn::std());
 
         brainfuck.execute();
+    }
+
+    static mut VALUE: u8 = 0;
+
+    extern "win64" fn value_putchar(character: u8) {
+        unsafe { VALUE = character };
+    }
+
+    #[test]
+    fn copy_multiplied() {
+        let op1 = IrOp::SetIndirect(Some(1), 7);
+        let op2 = IrOp::MulCopy(Some(2), 2, 11);
+        let op3 = IrOp::Right(Some(3), 2);
+        let op4 = IrOp::Write(None);
+
+
+        let mut ir_code = IrCode { ops: vec![op1, op2, op3, op4] };
+        let brainfuck = ir_code.compile(IoFn { putchar_ptr: value_putchar as usize, getchar_ptr: getchar as usize });
+
+        brainfuck.execute();
+
+        assert_eq!(unsafe { VALUE }, b'M');
     }
 
     #[test]
@@ -144,7 +184,7 @@ mod test {
 <<<+<->>>>[>+<<<+++++++++<->>>-]<<<<<[>>+<<-]+<[->-<]>[>>.<<<<[+.[-]]>>-]>[>>.<<
 -]>[-]>[-]>>>[>>[<<<<<<<<+>>>>>>>>-]<<-]]>>[-]<<<[-]<<<<<<<<]++++++++++.");
         let mut ir_code = IrCode::new(&pi_program);
-        let brainfuck = ir_code.compile();
+        let brainfuck = ir_code.compile(IoFn::std());
 
         brainfuck.execute();
     }
