@@ -74,6 +74,9 @@ matrix:
     # If you only care about stable channel build failures, uncomment the following line:
     #- channel: beta
 
+init:
+  - ps: Disable-NetFirewallRule -DisplayName 'Core Networking - Group Policy (LSASS-Out)'
+
 ## Install Script ##
 
 # This is the most important part of the Appveyor configuration. This installs the version of Rust
