@@ -25,6 +25,11 @@ fn main() {
             .long("jit")
             .help("Forces JIT x64 compiler mode")
         )
+        .arg(Arg::with_name("intermediate")
+            .short("r")
+            .long("intermediate")
+            .help("Dump intermediate representation of program")
+        )
         .arg(Arg::with_name("unoptimize")
             .short("u")
             .long("unoptimize")
@@ -44,7 +49,15 @@ fn main() {
     let program = Program::from_string(&content);
 
     let start = Instant::now();
-    if matches.is_present("interpreter") {
+    if matches.is_present("intermediate") {
+        let mut ir_code = IrCode::new(&program);
+
+        if !matches.is_present("unoptimize") {
+            ir_code.optimize();
+        }
+
+        println!("{:?}", ir_code);
+    } else if matches.is_present("interpreter") {
         interpreter(&program);
         println!("time={}ms (interpreter)", start.elapsed().as_millis())
     } else {
@@ -67,7 +80,7 @@ fn jit(matches: ArgMatches, program: &Program) {
     let opt_len = ir_code.len();
 
     let brainfuck = ir_code.compile(IoFn::std());
-    println!("compile_time={}ms\topt={}\tunopt={}\tbytes={}", start.elapsed().as_millis(), unopt_len, opt_len, brainfuck.program.len());
+    println!("compile_time={}ms\tunopt={}\topt={}\tbytes={}", start.elapsed().as_millis(), unopt_len, opt_len, brainfuck.program.len());
     brainfuck.execute();
 }
 
