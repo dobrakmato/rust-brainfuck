@@ -150,6 +150,22 @@ impl<'a> Assembler<'a> {
         self.imm32(imm);
     }
 
+    pub fn push(&mut self, reg: X64Register) {
+        if reg.is_extended() {
+            self.put(Rex::B.bits());
+        }
+
+        self.put(0x50 + reg.to_u8());
+    }
+
+    pub fn pop(&mut self, reg: X64Register) {
+        if reg.is_extended() {
+            self.put(Rex::B.bits());
+        }
+
+        self.put(0x58 + reg.to_u8());
+    }
+
     fn op_80(&mut self, opcode: u8, memory: X64Register, imm: u8) {
         if memory.is_extended() {
             self.put(Rex::B.bits());
@@ -302,6 +318,56 @@ impl<'a> Assembler<'a> {
 mod test {
     use std::collections::HashMap;
     use crate::assembler::{Assembler, X64Register};
+
+    #[test]
+    fn push() {
+        let mut asm = Assembler { addr: 0, data: &mut [0; 32], labels: HashMap::new() };
+
+        // 50                      push   rax
+        asm.push(X64Register::RAX);
+        assert_eq!(asm.data[..1], [0x50]);
+        asm.addr = 0;
+
+        // 41 50                   push   r8
+        asm.push(X64Register::R8);
+        assert_eq!(asm.data[..2], [0x41, 0x50]);
+        asm.addr = 0;
+
+        // 41 54                   push   r12
+        asm.push(X64Register::R12);
+        assert_eq!(asm.data[..2], [0x41, 0x54]);
+        asm.addr = 0;
+
+        // 41 55                   push   r13
+        asm.push(X64Register::R13);
+        assert_eq!(asm.data[..2], [0x41, 0x55]);
+        asm.addr = 0;
+    }
+
+    #[test]
+    fn pop() {
+        let mut asm = Assembler { addr: 0, data: &mut [0; 32], labels: HashMap::new() };
+
+        // 58                      pop    rax
+        asm.pop(X64Register::RAX);
+        assert_eq!(asm.data[..1], [0x58]);
+        asm.addr = 0;
+
+        // 41 58                   pop    r8
+        asm.pop(X64Register::R8);
+        assert_eq!(asm.data[..2], [0x41, 0x58]);
+        asm.addr = 0;
+
+        // 41 5c                   pop    r12
+        asm.pop(X64Register::R12);
+        assert_eq!(asm.data[..2], [0x41, 0x5c]);
+        asm.addr = 0;
+
+        // 41 5d                   pop    r13
+        asm.pop(X64Register::R13);
+        assert_eq!(asm.data[..2], [0x41, 0x5d]);
+        asm.addr = 0;
+    }
 
     #[test]
     fn mov() {

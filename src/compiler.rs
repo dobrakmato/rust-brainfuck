@@ -44,6 +44,11 @@ impl IrCode {
         assembler.mov(GETCHAR_REGISTER, io_fn.getchar_ptr as u64);
         assembler.mov(PTR_REGISTER, brainfuck.memory.as_ptr() as u64);
 
+        assembler.push(X64Register::RBX);
+        assembler.push(PUTCHAR_REGISTER);
+        assembler.push(GETCHAR_REGISTER);
+        assembler.push(PTR_REGISTER);
+
         let mut parentheses_depth = 0usize;
         let mut parentheses_id_stack = [0; 4096];
 
@@ -90,6 +95,12 @@ impl IrCode {
                 }
             }
         }
+
+        assembler.pop(PTR_REGISTER);
+        assembler.pop(GETCHAR_REGISTER);
+        assembler.pop(PUTCHAR_REGISTER);
+        assembler.pop(X64Register::RBX);
+
         assembler.ret();
 
         /* 2. resolve jumps */
@@ -127,7 +138,7 @@ impl Brainfuck {
         }
     }
 
-    pub fn execute(self) {
+    pub extern "C" fn execute(self) {
         let executable = self.program.make_exec().expect("cannot make memory executable");
         let ptr = executable.as_ptr() as *const ();
         let compiled_brainfuck: extern "C" fn() = unsafe { std::mem::transmute(ptr) };
@@ -162,7 +173,6 @@ mod test {
         let op2 = IrOp::MulCopy(Some(2), 2, 11);
         let op3 = IrOp::Right(Some(3), 2);
         let op4 = IrOp::Write(None);
-
 
         let mut ir_code = IrCode { ops: vec![op1, op2, op3, op4] };
         let brainfuck = ir_code.compile(IoFn { putchar_ptr: value_putchar as usize, getchar_ptr: getchar as usize });
