@@ -247,7 +247,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    pub fn mov_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: u8) {
+    fn op_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: u8, opcode: u8) {
         if offset > 127 { panic!("cannot encode offset > 127!"); }
 
         let rex = if to_memory.is_extended() { Rex::B } else { Rex::empty() };
@@ -257,7 +257,7 @@ impl<'a> Assembler<'a> {
             self.put(rex.bits());
         }
 
-        self.put(0x88);
+        self.put(opcode);
 
         match to_memory {
             X64Register::R12 => {
@@ -270,6 +270,14 @@ impl<'a> Assembler<'a> {
         }
 
         self.put(offset);
+    }
+
+    pub fn mov_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: u8) {
+        self.op_to_mem_offset(to_memory, from_reg, offset, 0x88);
+    }
+
+    pub fn add_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: u8) {
+        self.op_to_mem_offset(to_memory, from_reg, offset, 0x00);
     }
 
     pub fn je(&mut self, relative_addr: i32) {
@@ -446,6 +454,41 @@ mod test {
         // 44 88 40 04             mov    BYTE PTR [rax+0x4],r8b
         asm.mov_to_mem_offset(X64Register::RAX, X64Register::R8, 4);
         assert_eq!(asm.data[..4], [0x44, 0x88, 0x40, 0x04]);
+        asm.addr = 0;
+    }
+
+    #[test]
+    fn add_to_mem_offset() {
+        let mut asm = Assembler { addr: 0, data: &mut [0; 32], labels: HashMap::new() };
+
+        // 00 40 04                add    BYTE PTR [rax+0x4],al
+        asm.add_to_mem_offset(X64Register::RAX, X64Register::RAX, 4);
+        assert_eq!(asm.data[..3], [0x00, 0x40, 0x04]);
+        asm.addr = 0;
+
+        // 41 00 40 04             add    BYTE PTR [r8+0x4],al
+        asm.add_to_mem_offset(X64Register::R8, X64Register::RAX, 4);
+        assert_eq!(asm.data[..4], [0x41, 0x00, 0x40, 0x04]);
+        asm.addr = 0;
+
+        // 41 00 44 24 04          add    BYTE PTR [r12+0x4],al
+        asm.add_to_mem_offset(X64Register::R12, X64Register::RAX, 4);
+        assert_eq!(asm.data[..5], [0x41, 0x00, 0x44, 0x24, 0x04]);
+        asm.addr = 0;
+
+        // 41 00 45 04             add    BYTE PTR [r13+0x4],al
+        asm.add_to_mem_offset(X64Register::R13, X64Register::RAX, 4);
+        assert_eq!(asm.data[..4], [0x41, 0x00, 0x45, 0x04]);
+        asm.addr = 0;
+
+        // 45 00 46 04             add    BYTE PTR [r14+0x4],r8b
+        asm.add_to_mem_offset(X64Register::R14, X64Register::R8, 4);
+        assert_eq!(asm.data[..4], [0x45, 0x00, 0x46, 0x04]);
+        asm.addr = 0;
+
+        // 44 00 40 04             add    BYTE PTR [rax+0x4],r8b
+        asm.add_to_mem_offset(X64Register::RAX, X64Register::R8, 4);
+        assert_eq!(asm.data[..4], [0x44, 0x00, 0x40, 0x04]);
         asm.addr = 0;
     }
 

@@ -65,7 +65,7 @@ impl IrCode {
                     assembler.mov_to_reg(X64Register::RAX, PTR_REGISTER);
                     assembler.mov(X64Register::RBX, u64::from(*factor));
                     assembler.mul(X64Register::RBX);
-                    assembler.mov_to_mem_offset(PTR_REGISTER, X64Register::RAX, *offset)
+                    assembler.add_to_mem_offset(PTR_REGISTER, X64Register::RAX, *offset)
                 }
                 IrOp::Write(_) => {
                     assembler.sub(X64Register::RSP, 168);
