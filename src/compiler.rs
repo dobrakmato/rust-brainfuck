@@ -40,14 +40,14 @@ impl IrCode {
         let mut brainfuck = Brainfuck::new(256 + length * 8);
         let mut assembler: Assembler = Assembler::new(&mut brainfuck.program);
 
-        assembler.mov(PUTCHAR_REGISTER, io_fn.putchar_ptr as u64);
-        assembler.mov(GETCHAR_REGISTER, io_fn.getchar_ptr as u64);
-        assembler.mov(PTR_REGISTER, brainfuck.memory.as_ptr() as u64);
-
         assembler.push(X64Register::RBX);
         assembler.push(PUTCHAR_REGISTER);
         assembler.push(GETCHAR_REGISTER);
         assembler.push(PTR_REGISTER);
+
+        assembler.mov(PUTCHAR_REGISTER, io_fn.putchar_ptr as u64);
+        assembler.mov(GETCHAR_REGISTER, io_fn.getchar_ptr as u64);
+        assembler.mov(PTR_REGISTER, brainfuck.memory.as_ptr() as u64);
 
         let mut parentheses_depth = 0usize;
         let mut parentheses_id_stack = [0; 4096];
