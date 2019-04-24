@@ -37,7 +37,7 @@ impl IrCode {
     pub fn compile(&mut self, io_fn: IoFn) -> Brainfuck {
         let length = self.len();
 
-        let mut brainfuck = Brainfuck::new(256 + length * 8);
+        let mut brainfuck = Brainfuck::new(256 + length * 16);
         let mut assembler: Assembler = Assembler::new(&mut brainfuck.program);
 
         assembler.push(X64Register::RBX);
@@ -63,8 +63,8 @@ impl IrCode {
                 IrOp::SetIndirect(_, data) => assembler.mov_indirect(PTR_REGISTER, *data),
                 IrOp::MulCopy(_, offset, factor) => {
                     assembler.mov_to_reg(X64Register::RAX, PTR_REGISTER);
-                    assembler.mov(X64Register::RBX, u64::from(*factor));
-                    assembler.mul(X64Register::RBX);
+                    assembler.mov(X64Register::RBX, *factor as u64);
+                    assembler.mul_signed(X64Register::RBX);
                     assembler.add_to_mem_offset(PTR_REGISTER, X64Register::RAX, *offset)
                 }
                 IrOp::Write(_) => {
@@ -75,7 +75,7 @@ impl IrCode {
                 }
                 IrOp::Read(_) => {
                     assembler.sub(X64Register::RSP, 168);
-                    assembler.call(PUTCHAR_REGISTER);
+                    assembler.call(GETCHAR_REGISTER);
                     assembler.mov_to_memory(PTR_REGISTER, X64Register::RAX);
                     assembler.add(X64Register::RSP, 168);
                 }
@@ -161,10 +161,14 @@ mod test {
         brainfuck.execute();
     }
 
-    static mut VALUE: u8 = 0;
+    static mut OUTPUT: [u8; 4096] = [0; 4096];
+    static mut OUTPUT_IDX: usize = 0;
 
     extern "win64" fn value_putchar(character: u8) {
-        unsafe { VALUE = character };
+        unsafe {
+            OUTPUT[OUTPUT_IDX] = character;
+            OUTPUT_IDX += 1;
+        };
     }
 
     #[test]
@@ -177,9 +181,11 @@ mod test {
         let mut ir_code = IrCode { ops: vec![op1, op2, op3, op4] };
         let brainfuck = ir_code.compile(IoFn { putchar_ptr: value_putchar as usize, getchar_ptr: getchar as usize });
 
+        unsafe { OUTPUT_IDX = 0; }
+
         brainfuck.execute();
 
-        assert_eq!(unsafe { VALUE }, b'M');
+        assert_eq!(unsafe { OUTPUT[0] }, b'M');
     }
 
     #[test]
@@ -194,8 +200,27 @@ mod test {
 <<<+<->>>>[>+<<<+++++++++<->>>-]<<<<<[>>+<<-]+<[->-<]>[>>.<<<<[+.[-]]>>-]>[>>.<<
 -]>[-]>[-]>>>[>>[<<<<<<<<+>>>>>>>>-]<<-]]>>[-]<<<[-]<<<<<<<<]++++++++++.");
         let mut ir_code = IrCode::new(&pi_program);
-        let brainfuck = ir_code.compile(IoFn::std());
+        let brainfuck = ir_code.compile(IoFn { putchar_ptr: value_putchar as usize, getchar_ptr: getchar as usize });
+
+        unsafe { OUTPUT_IDX = 0; }
 
         brainfuck.execute();
+
+        assert_eq!(unsafe { OUTPUT[0] }, b'3');
+        assert_eq!(unsafe { OUTPUT[1] }, b'.');
+        assert_eq!(unsafe { OUTPUT[2] }, b'1');
+        assert_eq!(unsafe { OUTPUT[3] }, b'4');
+        assert_eq!(unsafe { OUTPUT[4] }, b'0');
+        assert_eq!(unsafe { OUTPUT[5] }, b'7');
+        assert_eq!(unsafe { OUTPUT[6] }, b'0');
+        assert_eq!(unsafe { OUTPUT[7] }, b'4');
+        assert_eq!(unsafe { OUTPUT[8] }, b'5');
+        assert_eq!(unsafe { OUTPUT[9] }, b'5');
+        assert_eq!(unsafe { OUTPUT[10] }, b'2');
+        assert_eq!(unsafe { OUTPUT[11] }, b'8');
+        assert_eq!(unsafe { OUTPUT[12] }, b'2');
+        assert_eq!(unsafe { OUTPUT[13] }, b'8');
+        assert_eq!(unsafe { OUTPUT[14] }, b'8');
+        assert_eq!(unsafe { OUTPUT[15] }, b'5');
     }
 }

@@ -25,9 +25,9 @@ fn main() {
             .long("jit")
             .help("Forces JIT x64 compiler mode")
         )
-        .arg(Arg::with_name("intermediate")
-            .short("r")
-            .long("intermediate")
+        .arg(Arg::with_name("dump")
+            .short("d")
+            .long("dump")
             .help("Dump intermediate representation of program")
         )
         .arg(Arg::with_name("unoptimize")
@@ -49,7 +49,7 @@ fn main() {
     let program = Program::from_string(&content);
 
     let start = Instant::now();
-    if matches.is_present("intermediate") {
+    if matches.is_present("dump") {
         let mut ir_code = IrCode::new(&program);
 
         if !matches.is_present("unoptimize") {

@@ -99,13 +99,22 @@ impl<'a> Assembler<'a> {
         self.imm64(imm);
     }
 
-    pub fn mul(&mut self, reg: X64Register) {
+    pub fn mul_unsigned(&mut self, reg: X64Register) {
         if reg.is_extended() {
             self.put(Rex::B.bits());
         }
 
         self.put(0xf6);
         self.mod_rm(4, 0b11, reg.to_u8());
+    }
+
+    pub fn mul_signed(&mut self, reg: X64Register) {
+        if reg.is_extended() {
+            self.put(Rex::B.bits());
+        }
+
+        self.put(0xf6);
+        self.mod_rm(5, 0b11, reg.to_u8());
     }
 
     pub fn mov_indirect(&mut self, memory: X64Register, imm: u8) {
@@ -247,9 +256,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    fn op_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: u8, opcode: u8) {
-        if offset > 127 { panic!("cannot encode offset > 127!"); }
-
+    fn op_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: i8, opcode: u8) {
         let rex = if to_memory.is_extended() { Rex::B } else { Rex::empty() };
         let rex = rex | if from_reg.is_extended() { Rex::R } else { Rex::empty() };
 
@@ -269,14 +276,14 @@ impl<'a> Assembler<'a> {
             }
         }
 
-        self.put(offset);
+        self.put(offset as u8);
     }
 
-    pub fn mov_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: u8) {
+    pub fn mov_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: i8) {
         self.op_to_mem_offset(to_memory, from_reg, offset, 0x88);
     }
 
-    pub fn add_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: u8) {
+    pub fn add_to_mem_offset(&mut self, to_memory: X64Register, from_reg: X64Register, offset: i8) {
         self.op_to_mem_offset(to_memory, from_reg, offset, 0x00);
     }
 
@@ -455,6 +462,11 @@ mod test {
         asm.mov_to_mem_offset(X64Register::RAX, X64Register::R8, 4);
         assert_eq!(asm.data[..4], [0x44, 0x88, 0x40, 0x04]);
         asm.addr = 0;
+
+        // 44 88 40 fc             mov    BYTE PTR [rax-0x4],r8b
+        asm.mov_to_mem_offset(X64Register::RAX, X64Register::R8, -4);
+        assert_eq!(asm.data[..4], [0x44, 0x88, 0x40, 0xfc]);
+        asm.addr = 0;
     }
 
     #[test]
@@ -490,25 +502,50 @@ mod test {
         asm.add_to_mem_offset(X64Register::RAX, X64Register::R8, 4);
         assert_eq!(asm.data[..4], [0x44, 0x00, 0x40, 0x04]);
         asm.addr = 0;
+
+        // 44 00 40 fc             add    BYTE PTR [rax-0x4],r8b
+        asm.add_to_mem_offset(X64Register::RAX, X64Register::R8, -4);
+        assert_eq!(asm.data[..4], [0x44, 0x00, 0x40, 0xfc]);
+        asm.addr = 0;
     }
 
     #[test]
-    fn mul() {
+    fn mul_unsigned() {
         let mut asm = Assembler { addr: 0, data: &mut [0; 32], labels: HashMap::new() };
 
         // f6 e0                   mul    al
-        asm.mul(X64Register::RAX);
+        asm.mul_unsigned(X64Register::RAX);
         assert_eq!(asm.data[..2], [0xf6, 0xe0]);
         asm.addr = 0;
 
         // 41 f6 e4                mul    r12b
-        asm.mul(X64Register::R12);
+        asm.mul_unsigned(X64Register::R12);
         assert_eq!(asm.data[..3], [0x41, 0xf6, 0xe4]);
         asm.addr = 0;
 
         // 41 f6 e5                mul    r13b
-        asm.mul(X64Register::R13);
+        asm.mul_unsigned(X64Register::R13);
         assert_eq!(asm.data[..3], [0x41, 0xf6, 0xe5]);
+        asm.addr = 0;
+    }
+
+    #[test]
+    fn mul_signed() {
+        let mut asm = Assembler { addr: 0, data: &mut [0; 32], labels: HashMap::new() };
+
+        // f6 e8                   imul   al
+        asm.mul_signed(X64Register::RAX);
+        assert_eq!(asm.data[..2], [0xf6, 0xe8]);
+        asm.addr = 0;
+
+        // 41 f6 ec                imul   r12b
+        asm.mul_signed(X64Register::R12);
+        assert_eq!(asm.data[..3], [0x41, 0xf6, 0xec]);
+        asm.addr = 0;
+
+        // 41 f6 ed                imul   r13b
+        asm.mul_signed(X64Register::R13);
+        assert_eq!(asm.data[..3], [0x41, 0xf6, 0xed]);
         asm.addr = 0;
     }
 
