@@ -11,6 +11,7 @@ mod compiler;
 mod brainfuck;
 mod interpreter;
 
+#[cfg_attr(tarpaulin, skip)]
 fn main() {
     let matches = App::new("bfjit")
         .version("v1.0")
@@ -67,6 +68,7 @@ fn main() {
     }
 }
 
+#[cfg_attr(tarpaulin, skip)]
 fn jit(matches: ArgMatches, program: &Program) {
     let start = Instant::now();
     let mut ir_code = IrCode::new(&program);
@@ -84,6 +86,7 @@ fn jit(matches: ArgMatches, program: &Program) {
     brainfuck.execute();
 }
 
+#[cfg_attr(tarpaulin, skip)]
 fn interpreter(program: &Program) {
     let mut vm = Interpreter {
         program_counter: 0,
