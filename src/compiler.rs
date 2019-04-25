@@ -64,7 +64,9 @@ impl IrCode {
                 IrOp::MulCopy(_, offset, factor) => {
                     assembler.mov_to_reg(X64Register::RAX, PTR_REGISTER);
                     assembler.mov(X64Register::RBX, *factor as u64);
-                    assembler.mul_signed(X64Register::RBX);
+                    if *factor != 1 {
+                        assembler.mul_signed(X64Register::RBX);
+                    }
                     assembler.add_to_mem_offset(PTR_REGISTER, X64Register::RAX, *offset)
                 }
                 IrOp::Write(_) => {
@@ -103,6 +105,9 @@ impl IrCode {
 
         assembler.ret();
 
+        /* save actual program length */
+        brainfuck.length = assembler.addr;
+
         /* 2. resolve jumps */
         let jumps_to_fix: Vec<(String, usize)> = assembler.labels
             .iter()
@@ -122,6 +127,7 @@ impl IrCode {
 
 pub struct Brainfuck {
     pub program: MmapMut,
+    pub length: usize,
     memory: [u8; MAX_MEMORY],
 }
 
@@ -134,6 +140,7 @@ impl Brainfuck {
 
         Brainfuck {
             program: binary,
+            length: 0,
             memory: [0; MAX_MEMORY],
         }
     }

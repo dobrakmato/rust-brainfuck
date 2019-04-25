@@ -82,7 +82,8 @@ fn jit(matches: ArgMatches, program: &Program) {
     let opt_len = ir_code.len();
 
     let brainfuck = ir_code.compile(IoFn::std());
-    println!("compile_time={}ms\tunopt={}\topt={}\tbytes={}", start.elapsed().as_millis(), unopt_len, opt_len, brainfuck.program.len());
+    println!("compile_time={}ms\tunopt={}\topt={}\tbytes={} of {} allocated ({:.2}% used)", start.elapsed().as_millis(),
+             unopt_len, opt_len, brainfuck.length, brainfuck.program.len(), 100f32 * brainfuck.length as f32 / brainfuck.program.len() as f32);
     brainfuck.execute();
 }
 
