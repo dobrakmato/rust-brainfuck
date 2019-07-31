@@ -44,6 +44,7 @@ impl IrCode {
         assembler.push(PUTCHAR_REGISTER);
         assembler.push(GETCHAR_REGISTER);
         assembler.push(PTR_REGISTER);
+        assembler.sub(X64Register::RSP, 168);
 
         assembler.mov(PUTCHAR_REGISTER, io_fn.putchar_ptr as u64);
         assembler.mov(GETCHAR_REGISTER, io_fn.getchar_ptr as u64);
@@ -70,16 +71,12 @@ impl IrCode {
                     assembler.add_to_mem_offset(PTR_REGISTER, X64Register::RAX, *offset)
                 }
                 IrOp::Write(_) => {
-                    assembler.sub(X64Register::RSP, 168);
                     assembler.mov_to_reg(X64Register::RCX, PTR_REGISTER);
                     assembler.call(PUTCHAR_REGISTER);
-                    assembler.add(X64Register::RSP, 168);
                 }
                 IrOp::Read(_) => {
-                    assembler.sub(X64Register::RSP, 168);
                     assembler.call(GETCHAR_REGISTER);
                     assembler.mov_to_memory(PTR_REGISTER, X64Register::RAX);
-                    assembler.add(X64Register::RSP, 168);
                 }
                 IrOp::JumpIfZero(_, _) => {
                     parentheses_depth += 1;
@@ -98,6 +95,7 @@ impl IrCode {
             }
         }
 
+        assembler.add(X64Register::RSP, 168);
         assembler.pop(PTR_REGISTER);
         assembler.pop(GETCHAR_REGISTER);
         assembler.pop(PUTCHAR_REGISTER);

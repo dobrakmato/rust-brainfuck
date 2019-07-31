@@ -137,6 +137,12 @@ impl IrCode {
 
             (IrOp::SetIndirect(_, _), IrOp::SetIndirect(far, c)) => Some(IrOp::SetIndirect(*far, *c)),
 
+            (IrOp::SetIndirect(_, 0), IrOp::JumpIfZero(x, y)) => Some(IrOp::JumpIfZero(*x, *y)),
+
+            (IrOp::Add(_, _), IrOp::Read(far)) => Some(IrOp::Read(*far)),
+            (IrOp::Sub(_, _), IrOp::Read(far)) => Some(IrOp::Read(*far)),
+            (IrOp::SetIndirect(_, _), IrOp::Read(far)) => Some(IrOp::Read(*far)),
+
             (_, _) => None,
         };
     }
@@ -146,8 +152,8 @@ impl IrCode {
 
         let mut iter = Iter { ir_code: self, idx: current.next()? }; /* None: next does not exists */
 
-        // were matching patterns like: [sub(1), right(1), add(3), right(1), add(7), left(2)]
-        // will record adds for different offsets by interpreting the code at compile time
+        // we are matching patterns like: [sub(1), right(1), add(3), right(1), add(7), left(2)]
+        // we will record adds for different offsets by interpreting the code at compile time
         // if we subtract more than 1, this is not clear-loop and so cannot be multiplication
         // loop. if offset is at the end different from zero, this is not multiplication loop.
         // if we see any other instructions, we return none too.
@@ -243,17 +249,7 @@ impl IrCode {
 
     // O(n)
     pub fn len(&self) -> usize {
-        let mut idx = 0;
-        let mut len = 0;
-
-        loop {
-            len += 1;
-            let curr = self.ops.get(idx).expect("cannot get next instruction");
-            idx = match curr.next() {
-                Some(t) => t,
-                None => return len
-            };
-        }
+        self.iter().count()
     }
 }
 
@@ -266,13 +262,12 @@ impl<'a> Iterator for Iter<'a> {
     type Item = &'a IrOp;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.ir_code.ops.get(self.idx) {
-            Some(t) => {
+        self.ir_code.ops
+            .get(self.idx)
+            .map(|t| {
                 self.idx = t.next().unwrap_or(std::usize::MAX); // proceed or point to invalid idx
-                Some(t)
-            }
-            None => None,
-        }
+                t
+            })
     }
 }
 
